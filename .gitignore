@@ -1,0 +1,22 @@
+# Môi trường Python và cache
+.venv*/
+venv/
+__pycache__/
+*.pyc
+
+# Dữ liệu và kết quả tại thư mục gốc
+/Images/
+/data/
+/reports/
+/runs/
+
+# Mô hình, tệp nén và tài liệu Word
+*.pt
+*.pth
+*.zip
+*.docx
+
+# Cấu hình bí mật
+.env
+.env.*
+!.env.example
