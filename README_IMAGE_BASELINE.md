@@ -154,3 +154,48 @@ Các test dùng ảnh tạo tạm và trọng số khởi tạo ngẫu nhiên ch
 - Validation chọn mô hình; Test đánh giá sau khi chốt.
 - Baseline ảnh tạo mốc cho bước thêm văn bản. Nhánh NASA vẫn độc lập.
 
+
+## Kiểm toán byte ảnh và lưu phiên bản dữ liệu
+
+Chạy riêng bước này trước huấn luyện. Nó đọc đường dẫn trong cả ba CSV Train,
+Validation, Test để tính SHA-256 từ byte ảnh và kiểm tra giải mã bằng Pillow; không chạy mô hình hay tính chỉ số
+trên Test. Không chuyển ảnh, sửa CSV, đổi nhãn hoặc chia lại split. Ảnh ngoài các
+CSV không thuộc phạm vi kiểm toán. Hash byte không phát hiện ảnh gần trùng hoặc
+ảnh đã được mã hóa lại.
+
+PowerShell tại thư mục gốc dự án:
+
+```powershell
+$manifest = "reports/image_hashes_" + (Get-Date -Format "yyyyMMdd_HHmmss_fffffff") + ".csv"
+.\.venv-image\Scripts\python.exe src/audit_image_hashes.py --output $manifest
+if ($LASTEXITCODE -ne 0) { throw "Kiem toan anh that bai; dung huan luyen va ra soat thong bao." }
+```
+
+Manifest có các cột `split,image_path,sha256`, đường dẫn tương đối dưới `Images`.
+Nếu phát hiện trùng byte giữa các split, công cụ vẫn lưu manifest, liệt kê mọi
+đường dẫn liên quan theo hash và thoát mã 1. Không tự xử lý các ảnh trùng. Một
+manifest được tạo không có nghĩa là kiểm toán đạt: phải kiểm tra mã thoát.
+Nếu thiếu ảnh/CSV hoặc đầu vào không hợp lệ, công cụ dừng và không ghi manifest
+hoàn chỉnh. Không ghi đè tệp đầu ra đã tồn tại.
+
+Đối chiếu với manifest đã lưu sau này (dùng đường dẫn baseline thực tế):
+
+```powershell
+$baseline = "reports/image_hashes_BASELINE.csv"
+$current = "reports/image_hashes_" + (Get-Date -Format "yyyyMMdd_HHmmss_fffffff") + ".csv"
+.\.venv-image\Scripts\python.exe src/audit_image_hashes.py --compare $baseline --output $current
+if ($LASTEXITCODE -ne 0) { throw "Du lieu thay doi hoac trung anh; dung va ra soat bao cao." }
+```
+
+So sánh báo `added`, `removed`, `changed` theo cặp split/đường dẫn; bất kỳ khác
+biệt nào cũng trả mã 1. Lưu baseline cùng hồ sơ thí nghiệm. Kiểm toán và huấn
+luyện là hai lệnh riêng: không thay đổi dữ liệu giữa hai bước. Manifest này kiểm
+tra byte ảnh và vị trí split, không thay thế kiểm tra mapping/nhãn của trainer.
+Trainer và evaluator hiện không tự nạp manifest; cần chạy lệnh đối chiếu trước
+khi huấn luyện hoặc đánh giá để kiểm tra phiên bản ảnh.
+
+Kiểm thử công cụ (dùng ảnh tạm, không cần PlantVillage):
+
+```powershell
+.\.venv-image\Scripts\python.exe -m unittest discover -s src -p "test_audit_image_hashes.py" -v
+```
